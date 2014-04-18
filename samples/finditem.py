@@ -12,9 +12,11 @@ from optparse import OptionParser
 sys.path.insert(0, '%s/../' % os.path.dirname(__file__))
 
 from common import dump
-from ebaysdk.finding import Connection as finding
-from ebaysdk.http import Connection as html
-from ebaysdk.parallel import Parallel
+
+import ebaysdk
+from ebaysdk.soa.finditem import Connection as FindItem
+from ebaysdk.shopping import Connection as Shopping
+from ebaysdk.utils import getNodeText
 from ebaysdk.exception import ConnectionError
 
 def init_options():
@@ -30,44 +32,38 @@ def init_options():
     parser.add_option("-a", "--appid",
                       dest="appid", default=None,
                       help="Specifies the eBay application id to use.")
+    parser.add_option("-c", "--consumer_id",
+                      dest="consumer_id", default=None,
+                      help="Specifies the eBay consumer_id id to use.")
 
     (opts, args) = parser.parse_args()
     return opts, args
 
-
 def run(opts):
 
     try:
-        p = Parallel()
-        apis = []
 
-        api1 = finding(parallel=p, debug=opts.debug, appid=opts.appid, config_file=opts.yaml)
-        api1.execute('findItemsAdvanced', {'keywords': 'python'})
-        apis.append(api1)
+        shopping = Shopping(debug=opts.debug, appid=opts.appid, 
+            config_file=opts.yaml, warnings=False)
 
-        api4 = html(parallel=p)
-        api4.execute('http://www.ebay.com/sch/i.html?_nkw=Shirt&_rss=1')
-        apis.append(api4)
+        shopping.execute('FindPopularItems', {'QueryKeywords': 'Python'})
+        nodes = shopping.response_dom().getElementsByTagName('ItemID')
+        itemIds = [getNodeText(n) for n in nodes]
 
-        api2 = finding(parallel=p, debug=opts.debug, appid=opts.appid, config_file=opts.yaml)
-        api2.execute('findItemsAdvanced', {'keywords': 'perl'})
-        apis.append(api2)
+        api = FindItem(debug=opts.debug, consumer_id=opts.consumer_id, config_file=opts.yaml)
+        
+        records = api.find_items_by_ids(itemIds)
 
-        api3 = finding(parallel=p, debug=opts.debug, appid=opts.appid, config_file=opts.yaml)
-        api3.execute('findItemsAdvanced', {'keywords': 'php'})
-        apis.append(api3)
+        for r in records:
+            print("ID(%s) TITLE(%s)" % (r['ITEM_ID'], r['TITLE'][:35]))
 
-        p.wait()
-
-        if p.error():
-            print p.error()
-
-        for api in apis:
-            dump(api)
+        dump(api)
 
     except ConnectionError as e:
         print e
 
+
 if __name__ == "__main__":
+    print("FindItem samples for SDK version %s" % ebaysdk.get_version())
     (opts, args) = init_options()
     run(opts)

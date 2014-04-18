@@ -6,12 +6,74 @@ Authored by: Tim Keefer
 Licensed under CDDL 1.0
 '''
 
-import xml.etree.ElementTree as ET
+try:
+    import xml.etree.ElementTree as ET
+except:
+    import cElementTree as ET # for 2.4
+
 import re
-from StringIO import StringIO
-       
+import sys
+from io import BytesIO
+
+def to_xml(data):
+    "Converts a list or dictionary to XML and returns it."
+
+    xml = ''
+
+    if type(data) == dict:
+        xml = dict2xml(data)
+    elif type(data) == list:
+        xml = list2xml(data)
+    else:
+        xml = data
+
+    return xml
+
+def getValue(response_dict, *args, **kwargs):
+    args_a = [w for w in args]
+    first = args_a[0]
+    args_a.remove(first)
+
+    h = kwargs.get('mydict', {})
+    if h:
+        h = h.get(first, {})
+    else:
+        h = response_dict.get(first, {})
+
+    if len(args) == 1:
+        try:
+            return h.get('value', None)
+        except:
+            return h
+
+    last = args_a.pop()
+
+    for a in args_a:
+        h = h.get(a, {})
+
+    h = h.get(last, {})
+
+    try:
+        return h.get('value', None)
+    except:
+        return h
+
+def getNodeText(node):
+    "Returns the node's text string."
+
+    rc = []
+
+    if hasattr(node, 'childNodes'):
+        for cn in node.childNodes:
+            if cn.nodeType == cn.TEXT_NODE:
+                rc.append(cn.data)
+            elif cn.nodeType == cn.CDATA_SECTION_NODE:
+                rc.append(cn.data)
+
+    return ''.join(rc)
+
 class object_dict(dict):
-    """object view of dict, you can 
+    """object view of dict, you can
     >>> a = object_dict()
     >>> a.fish = 'fish'
     >>> a['fish']
@@ -30,7 +92,7 @@ class object_dict(dict):
         dict.__init__(self, initd)
 
     def __getattr__(self, item):
-        try:        
+        try:
             d = self.__getitem__(item)
         except KeyError:
             return None
@@ -39,9 +101,9 @@ class object_dict(dict):
             return d['value']
         else:
             return d
-    
+
         # if value is the only key in object, you can omit it
-            
+
     def __setattr__(self, item, value):
         self.__setitem__(item, value)
 
@@ -49,7 +111,7 @@ class object_dict(dict):
         return self.get(item, {}).get('value', value)
 
     def __getstate__(self):
-        return self.items()
+        return list(self.items())
 
     def __setstate__(self, items):
         self.update(items)
@@ -64,7 +126,7 @@ class xml2dict(object):
         # Save attrs and text, hope there will not be a child with same name
         if node.text:
             node_tree.value = node.text
-        for (k,v) in node.attrib.items():
+        for (k,v) in list(node.attrib.items()):
             k,v = self._namespace_split(k, object_dict({'value':v}))
             node_tree[k] = v
         #Save childrens
@@ -76,8 +138,8 @@ class xml2dict(object):
             old = node_tree[tag]
             if not isinstance(old, list):
                 node_tree.pop(tag)
-                node_tree[tag] = [old] # multi times, so change old dict to a list       
-            node_tree[tag].append(tree) # add the new one      
+                node_tree[tag] = [old] # multi times, so change old dict to a list
+            node_tree[tag].append(tree) # add the new one
 
         return node_tree
 
@@ -89,14 +151,14 @@ class xml2dict(object):
         """
         result = re.compile("\{(.*)\}(.*)").search(tag)
         if result:
-            value.namespace, tag = result.groups()    
+            value.namespace, tag = result.groups()
 
         return (tag,value)
 
     def parse(self, file):
         """parse a xml file to a dict"""
         f = open(file, 'r')
-        return self.fromstring(f.read()) 
+        return self.fromstring(f.read())
 
     def fromstring(self, s):
         """parse a string"""
@@ -116,7 +178,7 @@ class Struct(object):
     """Emulate a cross over between a dict() and an object()."""
     def __init__(self, entries, default=None, nodefault=False):
         # ensure all keys are strings and nothing else
-        entries = dict([(str(x), y) for x, y in entries.items()])
+        entries = dict([(str(x), y) for x, y in list(entries.items())])
         self.__dict__.update(entries)
         self.__default = default
         self.__nodefault = nodefault
@@ -192,9 +254,9 @@ class Struct(object):
         """
         return item in self.__dict__
 
-    def __nonzero__(self):
+    def __bool__(self):
         """Returns whether the instance evaluates to False"""
-        return bool(self.items())
+        return bool(list(self.items()))
 
     def has_key(self, item):
         """Emulate dict.has_key() functionality.
@@ -214,7 +276,7 @@ class Struct(object):
         >>> obj.items()
         [('a', 'b')]
         """
-        return [(k, v) for (k, v) in self.__dict__.items() if not k.startswith('_Struct__')]
+        return [(k, v) for (k, v) in list(self.__dict__.items()) if not k.startswith('_Struct__')]
 
     def keys(self):
         """Emulate dict.keys() functionality.
@@ -223,7 +285,7 @@ class Struct(object):
         >>> obj.keys()
         ['a']
         """
-        return [k for (k, _v) in self.__dict__.items() if not k.startswith('_Struct__')]
+        return [k for (k, _v) in list(self.__dict__.items()) if not k.startswith('_Struct__')]
 
     def values(self):
         """Emulate dict.values() functionality.
@@ -232,10 +294,10 @@ class Struct(object):
         >>> obj.values()
         ['b']
         """
-        return [v for (k, v) in self.__dict__.items() if not k.startswith('_Struct__')]
+        return [v for (k, v) in list(self.__dict__.items()) if not k.startswith('_Struct__')]
 
     def __repr__(self):
-        return "<Struct: %r>" % dict(self.items())
+        return "<Struct: %r>" % dict(list(self.items()))
 
     def as_dict(self):
         """Return a dict representing the content of this struct."""
@@ -287,15 +349,13 @@ def make_struct(obj, default=None, nodefault=False):
     """
     if type(obj) == type(Struct):
         return obj
-    if (not hasattr(obj, '__dict__')) and hasattr(obj, 'iterkeys'):
-        # this should be a dict
+    if type(obj) == dict:
         struc = Struct(obj, default, nodefault)
         # handle recursive sub-dicts
-        for key, val in obj.items():
+        for key, val in list(obj.items()):
             setattr(struc, key, make_struct(val, default, nodefault))
         return struc
-    elif hasattr(obj, '__delslice__') and hasattr(obj, '__getitem__'):
-        #
+    elif type(obj) == list:
         return [make_struct(v, default, nodefault) for v in obj]
     else:
         return obj
@@ -308,22 +368,34 @@ def _convert_dict_to_xml_recurse(parent, dictitem, listnames):
     assert not isinstance(dictitem, list)
 
     if isinstance(dictitem, dict):
-        for (tag, child) in sorted(dictitem.iteritems()):
+        # special case of attrs and text
+        if '@attrs' in dictitem.keys():
+            attrs = dictitem.pop('@attrs')
+            for key, value in attrs.iteritems():
+                parent.set(key, value) # TODO: will fail if attrs is not a dict
+        if '#text' in dictitem.keys():
+            text = dictitem.pop('#text')
+            if sys.version_info[0] < 3:
+                parent.text = unicode(text)
+            else:
+                parent.text = str(text)
+        for (tag, child) in sorted(dictitem.items()):
             if isinstance(child, list):
                 # iterate through the array and convert
-                listelem = ET.Element('')
-                listelem2 = ET.Element(tag)
-                parent.append(listelem)
+                listparent = ET.Element(tag if tag in listnames.keys() else '')
+                parent.append(listparent)
                 for listchild in child:
-                    elem = ET.Element(listnames.get(tag, listelem2.tag))
-                    listelem.append(elem)
-                    _convert_dict_to_xml_recurse(elem, listchild, listnames)
+                    item = ET.SubElement(listparent, listnames.get(tag, tag))
+                    _convert_dict_to_xml_recurse(item, listchild, listnames)
             else:
                 elem = ET.Element(tag)
                 parent.append(elem)
                 _convert_dict_to_xml_recurse(elem, child, listnames)
     elif not dictitem is None:
-        parent.text = unicode(dictitem)
+        if sys.version_info[0] < 3:
+            parent.text = unicode(dictitem)
+        else:
+            parent.text = str(dictitem)
 
 
 def dict2et(xmldict, roottag='data', listnames=None):
@@ -333,8 +405,8 @@ def dict2et(xmldict, roottag='data', listnames=None):
 
     >>> data = {"nr": "xq12", "positionen": [{"m": 12}, {"m": 2}]}
     >>> root = dict2et(data)
-    >>> ET.tostring(root)
-    '<data><nr>xq12</nr><positionen><item><m>12</m></item><item><m>2</m></item></positionen></data>'
+    >>> ET.tostring(root, encoding="utf-8").replace('<>', '').replace('</>','')
+    '<data><nr>xq12</nr><positionen><m>12</m></positionen><positionen><m>2</m></positionen></data>'
 
     Per default ecerything ins put in an enclosing '<data>' element. Also per default lists are converted
     to collecitons of `<item>` elements. But by provding a mapping between list names and element names,
@@ -342,11 +414,11 @@ def dict2et(xmldict, roottag='data', listnames=None):
 
     >>> data = {"positionen": [{"m": 12}, {"m": 2}]}
     >>> root = dict2et(data, roottag='xml')
-    >>> ET.tostring(root)
-    '<xml><positionen><item><m>12</m></item><item><m>2</m></item></positionen></xml>'
+    >>> ET.tostring(root, encoding="utf-8").replace('<>', '').replace('</>','')
+    '<xml><positionen><m>12</m></positionen><positionen><m>2</m></positionen></xml>'
 
     >>> root = dict2et(data, roottag='xml', listnames={'positionen': 'position'})
-    >>> ET.tostring(root)
+    >>> ET.tostring(root, encoding="utf-8").replace('<>', '').replace('</>','')
     '<xml><positionen><position><m>12</m></position><position><m>2</m></position></positionen></xml>'
 
     >>> data = {"kommiauftragsnr":2103839, "anliefertermin":"2009-11-25", "prioritaet": 7,
@@ -357,7 +429,8 @@ def dict2et(xmldict, roottag='data', listnames=None):
     ... ]}
 
     >>> print ET.tostring(dict2et(data, 'kommiauftrag',
-    ... listnames={'positionen': 'position', 'versandeinweisungen': 'versandeinweisung'}))
+    ... listnames={'positionen': 'position', 'versandeinweisungen': 'versandeinweisung'}),
+    ... encoding="utf-8").replace('<>', '').replace('</>','')
     ...  # doctest: +SKIP
     '''<kommiauftrag>
     <anliefertermin>2009-11-25</anliefertermin>
@@ -398,17 +471,20 @@ def list2et(xmllist, root, elementname):
     return basexml.find(root)
 
 
-def dict2xml(datadict, roottag='TRASHME', listnames=None, pretty=False):
+def dict2xml(datadict, roottag='', listnames=None, pretty=False):
     """
     Converts a dictionary to an UTF-8 encoded XML string.
     See also dict2et()
     """
-    root = dict2et(datadict, roottag, listnames)
-    
-    xml = to_string(root, pretty=pretty)
-    xml = xml.replace('<>', '').replace('</>','')
-    return xml.replace('<%s>' % roottag, '').replace('</%s>' % roottag, '')
-    
+    if isinstance(datadict, dict) and len(datadict):
+        root = dict2et(datadict, roottag, listnames)
+        xml = to_string(root, pretty=pretty)
+        xml = xml.replace('<>', '').replace('</>', '')
+        return xml
+    else:
+        return ''
+
+
 def list2xml(datalist, roottag, elementname, pretty=False):
     """Converts a list to an UTF-8 encoded XML string.
 
@@ -418,17 +494,20 @@ def list2xml(datalist, roottag, elementname, pretty=False):
     return to_string(root, pretty=pretty)
 
 
-def to_string(root, encoding='utf-8', pretty=False):
+def to_string(root, pretty=False):
     """Converts an ElementTree to a string"""
 
     if pretty:
         indent(root)
 
     tree = ET.ElementTree(root)
-    fileobj = StringIO()
-    #fileobj.write('<?xml version="1.0" encoding="%s"?>' % encoding)
+    fileobj = BytesIO()
+
+    # asdf fileobj.write('<?xml version="1.0" encoding="%s"?>' % encoding)
+
     if pretty:
         fileobj.write('\n')
+
     tree.write(fileobj, 'utf-8')
     return fileobj.getvalue()
 
@@ -467,7 +546,7 @@ def test():
             "artnr": "14695",
             "batchnr": "3104247"}
     xmlstr = dict2xml(data, roottag='warenzugang')
-    assert xmlstr == ('<?xml version="1.0" encoding="utf-8"?><warenzugang><artnr>14695</artnr>'
+    assert xmlstr == ('<warenzugang><artnr>14695</artnr>'
                       '<batchnr>3104247</batchnr><guid>3104247-7</guid><menge>7</menge></warenzugang>')
 
     data = {"kommiauftragsnr": 2103839,
@@ -481,10 +560,10 @@ def test():
      "name1": "Uwe Zweihaus",
      "name2": "400424990",
      "name3": "",
-     u"strasse": u"Bahnhofstr. 2",
+     "strasse": "Bahnhofstr. 2",
      "land": "DE",
      "plz": "42499",
-     "ort": u"Hücksenwagen",
+     "ort": "Hücksenwagen",
      "positionen": [{"menge": 12,
                      "artnr": "14640/XL",
                      "posnr": 1},
@@ -499,7 +578,7 @@ def test():
                               "anweisung": "48h vor Anlieferung unter 0900-LOGISTIK avisieren"},
                              {"guid": "2103839-GuTi",
                               "bezeichner": "abpackern140",
-                              "anweisung": u"Paletten höchstens auf 140 cm Packen"}]
+                              "anweisung": "Paletten höchstens auf 140 cm Packen"}]
     }
 
     xmlstr = dict2xml(data, roottag='kommiauftrag')
@@ -529,7 +608,6 @@ def test():
                 "art": "paket"}]}
 
     xmlstr = dict2xml(data, roottag='rueckmeldung')
-    print xmlstr
 
 if __name__ == '__main__':
     import doctest

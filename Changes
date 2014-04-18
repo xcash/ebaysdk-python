@@ -1,5 +1,29 @@
 Changes for ebaysdk
 
+1.0.3
+- rework unicode fix
+- fix logging handler
+
+1.0.2 Sat Feb  8 20:44:00 PST 2014
+- fix unicode issue is dict to xml routine
+- add a unicode test
+- fix http back-end
+
+1.0.0
+- Major refactor
+  + changes are backward compatible unless your subclassing any of the 
+    SDK classes
+  + moved from PyCurl to Python Requests
+  + code organization
+  + standard python logging
+  + add exceptions
+
+0.1.11
+- Add affiliate headers to the Shopping API back-end
+- https://github.com/timotheus/ebaysdk-python/issues/40
+  fix datatype issue with error codes from the shopping API
+  
+- added py3 support thanks to Nikolay Derkach
 - store response error codes in an array when processing response.
   The reponse error codes can be accessed by the api.response_codes()
   accessor.
