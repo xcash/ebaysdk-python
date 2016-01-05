@@ -6,35 +6,54 @@ Authored by: Tim Keefer
 Licensed under CDDL 1.0
 '''
 
+import sys
 import unittest
 import doctest
 import ebaysdk.utils
 import ebaysdk.config
-import ebaysdk.http
+import ebaysdk.response
 import ebaysdk.connection
-import ebaysdk.finding
+import ebaysdk.http
 import ebaysdk.shopping
 import ebaysdk.trading
 import ebaysdk.merchandising
 import ebaysdk.soa.finditem
-import ebaysdk.parallel
+import ebaysdk.finding
+import ebaysdk.poller.orders
+import ebaysdk.inventorymanagement
+
+# does not pass with python3.3
+try:
+    import ebaysdk.parallel
+except ImportError:
+    pass
+
 
 def getTestSuite():
     suite = unittest.TestSuite()
 
-    suite.addTest(doctest.DocTestSuite(ebaysdk.parallel))
-    suite.addTest(doctest.DocTestSuite(ebaysdk.connection))
-    suite.addTest(doctest.DocTestSuite(ebaysdk.config))
+    suite.addTest(doctest.DocTestSuite(ebaysdk.poller.orders))
     suite.addTest(doctest.DocTestSuite(ebaysdk.utils))
-    suite.addTest(doctest.DocTestSuite(ebaysdk.finding))
+    suite.addTest(doctest.DocTestSuite(ebaysdk.config))
+    suite.addTest(doctest.DocTestSuite(ebaysdk.response))
+    suite.addTest(doctest.DocTestSuite(ebaysdk.connection))
     suite.addTest(doctest.DocTestSuite(ebaysdk.http))
     suite.addTest(doctest.DocTestSuite(ebaysdk.shopping))
     suite.addTest(doctest.DocTestSuite(ebaysdk.trading))
     suite.addTest(doctest.DocTestSuite(ebaysdk.merchandising))
-    
-    # Internal Only Service
-    #uite.addTest(doctest.DocTestSuite(ebaysdk.soa.finditem))
+    suite.addTest(doctest.DocTestSuite(ebaysdk.finding))
+    suite.addTest(doctest.DocTestSuite(ebaysdk.inventorymanagement))
+
+    if not sys.version_info[0] >= 3 \
+        and sys.modules.has_key('grequests') is True:
+        #suite.addTest(doctest.DocTestSuite(ebaysdk.parallel))
+        pass
+
+    # inside only
+    #suite.addTest(doctest.DocTestSuite(ebaysdk.soa.finditem))
+
     return suite
 
 runner = unittest.TextTestRunner()
 runner.run(getTestSuite())
+

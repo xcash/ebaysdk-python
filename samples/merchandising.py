@@ -13,9 +13,9 @@ sys.path.insert(0, '%s/../' % os.path.dirname(__file__))
 
 from common import dump
 
-import ebaysdk
 from ebaysdk.merchandising import Connection as merchandising
 from ebaysdk.exception import ConnectionError
+
 
 def init_options():
     usage = "usage: %prog [options]"
@@ -34,16 +34,18 @@ def init_options():
     (opts, args) = parser.parse_args()
     return opts, args
 
+
 def run(opts):
     try:
         api = merchandising(debug=opts.debug, appid=opts.appid,
                             config_file=opts.yaml, warnings=True)
 
-        api.execute('getMostWatchedItems', {'maxResults': 3})
+        response = api.execute('getMostWatchedItems', {'maxResults': 4})
 
         dump(api)
     except ConnectionError as e:
-        print e
+        print(e)
+        print(e.response.dict())
 
 
 if __name__ == "__main__":

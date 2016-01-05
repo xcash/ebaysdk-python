@@ -5,6 +5,9 @@
 Authored by: Tim Keefer
 Licensed under CDDL 1.0
 '''
+import sys
+if sys.version_info[0] >= 3:
+    raise ImportError('grequests does not work with python3+')
 
 import grequests
 from ebaysdk.exception import ConnectionError
@@ -17,7 +20,7 @@ class Parallel(object):
     >>> import os
     >>> p = Parallel()
     >>> r1 = html(parallel=p)
-    >>> retval = r1.execute('http://shop.ebay.com/i.html?rt=nc&_nkw=mytouch+slide&_dmpt=PDA_Accessories&_rss=1')
+    >>> retval = r1.execute('http://feeds.feedburner.com/slashdot/audio?format=xml')
     >>> r2 = finding(parallel=p, config_file=os.environ.get('EBAY_YAML'))
     >>> retval = r2.execute('findItemsAdvanced', {'keywords': 'shoes'})
     >>> r3 = shopping(parallel=p, config_file=os.environ.get('EBAY_YAML'))
@@ -25,11 +28,11 @@ class Parallel(object):
     >>> p.wait()
     >>> print(p.error())
     None
-    >>> print(r1.response_obj().rss.channel.ttl)
-    60
-    >>> print(r2.response_dict().ack)
+    >>> print(r1.response.reply.rss.channel.ttl)
+    2
+    >>> print(r2.response.dict()['ack'])
     Success
-    >>> print(r3.response_obj().Ack)
+    >>> print(r3.response.reply.Ack)
     Success
     """
 
@@ -59,8 +62,11 @@ class Parallel(object):
                                         allow_redirects=True)
 
                 self._grequests.append(req)
+                
+            def exception_handler(request, exception):
+                self._errors.append("%s" % exception)
 
-            gresponses = grequests.map(self._grequests)
+            gresponses = grequests.map(self._grequests, exception_handler=exception_handler)
 
             for idx, r in enumerate(self._requests):
                 r.response = gresponses[idx]
@@ -82,3 +88,12 @@ class Parallel(object):
             return "parallel error:\n%s\n" % ("\n".join(self._errors))
 
         return None
+
+
+if __name__ == '__main__':
+
+    import doctest
+    import sys
+
+    failure_count, test_count = doctest.testmod()
+    sys.exit(failure_count)

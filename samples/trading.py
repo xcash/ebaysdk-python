@@ -43,6 +43,7 @@ def init_options():
     (opts, args) = parser.parse_args()
     return opts, args
 
+
 def run(opts):
 
     try:
@@ -51,10 +52,12 @@ def run(opts):
 
         api.execute('GetCharities', {'CharityID': 3897})
         dump(api)
-        print(api.response_dict().Charity.Name)
+        print(api.response.reply.Charity.Name)
 
     except ConnectionError as e:
-        print e
+        print(e)
+        print(e.response.dict())
+
 
 def feedback(opts):
     try:
@@ -64,13 +67,14 @@ def feedback(opts):
         api.execute('GetFeedback', {'UserID': 'tim0th3us'})
         dump(api)
 
-        if int(api.response_dict().FeedbackScore) > 50:
+        if int(api.response.reply.FeedbackScore) > 50:
             print("Doing good!")
         else:
             print("Sell more, buy more..")
-    
+
     except ConnectionError as e:
-        print e
+        print(e)
+        print(e.response.dict())
 
 
 def getTokenStatus(opts):
@@ -83,7 +87,9 @@ def getTokenStatus(opts):
         dump(api)
 
     except ConnectionError as e:
-        print e
+        print(e)
+        print(e.response.dict())
+
 
 def verifyAddItem(opts):
     """http://www.utilities-online.info/xmltojson/#.UXli2it4avc
@@ -134,7 +140,9 @@ def verifyAddItem(opts):
         dump(api)
 
     except ConnectionError as e:
-        print e
+        print(e)
+        print(e.response.dict())
+
 
 def verifyAddItemErrorCodes(opts):
     """http://www.utilities-online.info/xmltojson/#.UXli2it4avc
@@ -182,17 +190,19 @@ def verifyAddItemErrorCodes(opts):
         }
 
         api.execute('VerifyAddItem', myitem)
-    
+
     except ConnectionError as e:
         # traverse the DOM to look for error codes
-        for node in api.response_dom().getElementsByTagName('ErrorCode'):
-            print("error code: %s" % getNodeText(node))
+        for node in api.response.dom().findall('ErrorCode'):
+            print("error code: %s" % node.text)
 
         # check for invalid data - error code 37
         if 37 in api.response_codes():
             print("Invalid data in request")
 
-        print e
+        print(e)
+        print(e.response.dict())
+
 
 def uploadPicture(opts):
 
@@ -210,7 +220,32 @@ def uploadPicture(opts):
         dump(api)
 
     except ConnectionError as e:
-        print e
+        print(e)
+        print(e.response.dict())
+
+
+def uploadPictureFromFilesystem(opts, filepath):
+
+    try:
+        api = Trading(debug=opts.debug, config_file=opts.yaml, appid=opts.appid,
+                      certid=opts.certid, devid=opts.devid, warnings=True)
+
+        # pass in an open file
+        # the Requests module will close the file
+        files = {'file': ('EbayImage', open(filepath, 'rb'))}
+
+        pictureData = {
+            "WarningLevel": "High",
+            "PictureName": "WorldLeaders"
+        }
+
+        api.execute('UploadSiteHostedPictures', pictureData, files=files)
+        dump(api)
+
+    except ConnectionError as e:
+        print(e)
+        print(e.response.dict())
+
 
 def memberMessages(opts):
 
@@ -236,17 +271,19 @@ def memberMessages(opts):
 
         dump(api)
 
-        if api.response_dict().MemberMessage:
-            messages = api.response_dict().MemberMessage.MemberMessageExchange
+        if api.response.reply.has_key('MemberMessage'):
+            messages = api.response.reply.MemberMessage.MemberMessageExchange
 
             if type(messages) != list:
-                    messages = [ messages ]
+                    messages = [messages]
 
             for m in messages:
                 print("%s: %s" % (m.CreationDate, m.Question.Subject[:50]))
 
     except ConnectionError as e:
-        print e
+        print(e)
+        print(e.response.dict())
+
 
 def getUser(opts):
     try:
@@ -256,9 +293,11 @@ def getUser(opts):
 
         api.execute('GetUser', {'UserID': 'biddergoat'})
         dump(api, full=False)
-    
+
     except ConnectionError as e:
-        print e
+        print(e)
+        print(e.response.dict())
+
 
 def getOrders(opts):
 
@@ -270,7 +309,8 @@ def getOrders(opts):
         dump(api, full=False)
 
     except ConnectionError as e:
-        print e
+        print(e)
+        print(e.response.dict())
 
 def categories(opts):
 
@@ -288,7 +328,8 @@ def categories(opts):
         dump(api, full=False)
 
     except ConnectionError as e:
-        print e
+        print(e)
+        print(e.response.dict())
 
 '''
 api = trading(domain='api.sandbox.ebay.com')
@@ -310,6 +351,7 @@ if __name__ == "__main__":
     getTokenStatus(opts)
     verifyAddItemErrorCodes(opts)
     uploadPicture(opts)
+    uploadPictureFromFilesystem(opts, ("%s/test_image.jpg" % os.path.dirname(__file__)))
     memberMessages(opts)
     categories(opts)
     getUser(opts)

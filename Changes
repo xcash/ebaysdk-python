@@ -1,5 +1,38 @@
 Changes for ebaysdk
 
+- fix unicode issue between py2 and py3
+- add a unicode example in the samples dir
+- fix for issue #127 (false-ish check)
+- merge in py3 datatype fix from MartiONE
+
+2.1.2 Thu Jun 25 14:54:12 PDT 2015 
+- merge in rowbare PR that support file upload
+- refactor order poller into a Class and implement a base Storage class
+  that can be used for any domain specific actions (e.g. inserting into a DB)
+- merged in backend support for inventory management (from bimusiek)
+- add backend for Business Policy API (from nickspring)
+- set ssl verify to True in connection class
+
+2.1.1 Tue Apr 14 20:16:47 PDT 2015
+- merge in pull request to fix unicode issues
+- remove PyYAML dependency
+- add poller package for pulling orders
+
+2.1.0 Mon Jul  7 10:03:36 PDT 2014
+- modify install instructions
+- remove grequests install dep from setup.py
+
+2.0.0
+- WARNING!! This release breaks some backward compatibility
+  Read https://github.com/timotheus/ebaysdk-python/wiki/Migrating-from-v1-to-v2
+- imports: Modified package structure
+- execute(): Modified return value
+- Switched to lxml.etree
+- Added a new response class
+  response.reply, response.dom(), response.dict(), response.json()
+- Added ebaysdk exception classes
+- Modified utils.py (dict2xml, xml2dict)
+
 1.0.3
 - rework unicode fix
 - fix logging handler

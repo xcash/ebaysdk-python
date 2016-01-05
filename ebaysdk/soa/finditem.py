@@ -9,7 +9,7 @@ Licensed under CDDL 1.0
 import os
 
 from ebaysdk.soa import Connection as BaseConnection
-from ebaysdk.utils import to_xml, getNodeText
+from ebaysdk.utils import dict2xml, getNodeText
 
 class Connection(BaseConnection):
     """
@@ -23,7 +23,7 @@ class Connection(BaseConnection):
     SOAP support. FindItemServiceNextGen works fine with standard XML
     and lets avoid all of the ugliness associated with SOAP.
 
-    >>> from ebaysdk.shopping import Connection as Shopping 
+    >>> from ebaysdk.shopping import Connection as Shopping
     >>> s = Shopping(config_file=os.environ.get('EBAY_YAML'))
     >>> retval = s.execute('FindPopularItems', {'QueryKeywords': 'Python'})
     >>> nodes = s.response_dom().getElementsByTagName('ItemID')
@@ -36,15 +36,15 @@ class Connection(BaseConnection):
     True
     """
 
-    def __init__(self, site_id='EBAY-US', debug=False, consumer_id=None, 
-                 **kwargs):
+    def __init__(self, site_id='EBAY-US', debug=False, consumer_id=None,
+                 domain='apifindingcore.vip.ebay.com', **kwargs):
 
         super(Connection, self).__init__(consumer_id=consumer_id,
-                                         domain='apifindingcore.vip.ebay.com',
+                                         domain=domain,
                                          app_config=None,
                                          site_id=site_id,
                                          debug=debug, **kwargs)
-        
+
         self.config.set('domain', 'apifindingcore.vip.ebay.com')
         self.config.set('service', 'FindItemServiceNextGen', force=True)
         self.config.set('https', False)
@@ -52,6 +52,9 @@ class Connection(BaseConnection):
         self.config.set('consumer_id', consumer_id)
 
         self.read_set = None
+
+        self.datetime_nodes += ['lastupdatetime', 'timestamp']
+        self.base_list_nodes += ['finditemsbyidsresponse.record']
 
     def build_request_headers(self, verb):
         return {
@@ -76,24 +79,29 @@ class Connection(BaseConnection):
                     'name': rtype
                 }
             })
-            
-        args = {'id': ebay_item_ids, 'readSet': read_set_node}            
+
+        args = {'id': ebay_item_ids, 'readSet': read_set_node}
         self.execute('findItemsByIds', args)
         return self.mappedResponse()
 
     def mappedResponse(self):
         records = []
 
-        for r in self.response_dict().get('record', []):
+        for r in self.response.dict().get('record', []):
             mydict = dict()
             i = 0
-            for values_dict in r.value:                
-                for key, value in values_dict.iteritems():
+
+            for values_dict in r.get('value', {}):
+
+                if values_dict is None:
+                    continue
+
+                for key, value in values_dict.items():
                     value_data = None
                     if type(value) == list:
-                        value_data = [x['value'] for x in value]
+                        value_data = [x for x in value]
                     else:
-                        value_data = value['value']
+                        value_data = value
 
                     mydict.update({self.read_set[i]: value_data})
 
@@ -101,17 +109,17 @@ class Connection(BaseConnection):
 
             records.append(mydict)
 
-        return records                    
+        return records
 
     def find_items_by_ids(self, *args, **kwargs):
         return self.findItemsByIds(*args, **kwargs)
 
-    def build_request_data(self, verb, data):        
+    def build_request_data(self, verb, data, verb_attrs):
         xml = "<?xml version='1.0' encoding='utf-8'?>"
         xml += "<" + verb + "Request"
         xml += ' xmlns="http://www.ebay.com/marketplace/search/v1/services"'
         xml += '>'
-        xml += to_xml(data) or ''
+        xml += dict2xml(data)
         xml += "</" + verb + "Request>"
 
         return xml

@@ -7,6 +7,8 @@ Licensed under CDDL 1.0
 
 import os
 import sys
+import gevent
+
 from optparse import OptionParser
 
 sys.path.insert(0, '%s/../' % os.path.dirname(__file__))
@@ -14,7 +16,6 @@ sys.path.insert(0, '%s/../' % os.path.dirname(__file__))
 from common import dump
 from ebaysdk.finding import Connection as finding
 from ebaysdk.http import Connection as html
-from ebaysdk.parallel import Parallel
 from ebaysdk.exception import ConnectionError
 
 def init_options():
@@ -37,37 +38,41 @@ def init_options():
 
 def run(opts):
 
+    timeout = gevent.Timeout(4)
+    timeout.start()
+
     try:
-        p = Parallel()
-        apis = []
+        calls = []
 
-        api1 = finding(parallel=p, debug=opts.debug, appid=opts.appid, config_file=opts.yaml)
-        api1.execute('findItemsAdvanced', {'keywords': 'python'})
-        apis.append(api1)
+        for page in range(1, 10):
+            api = finding(debug=opts.debug, appid=opts.appid, config_file=opts.yaml)
+            call = gevent.spawn(api.execute,
+                                'findItemsAdvanced',
+                                {'keywords': 'python',
+                                 'paginationInput': {'pageNumber': page}})
+            calls.append(call)
 
-        api4 = html(parallel=p)
-        api4.execute('http://www.ebay.com/sch/i.html?_nkw=Shirt&_rss=1')
-        apis.append(api4)
+        gevent.joinall(calls)
 
-        api2 = finding(parallel=p, debug=opts.debug, appid=opts.appid, config_file=opts.yaml)
-        api2.execute('findItemsAdvanced', {'keywords': 'perl'})
-        apis.append(api2)
+        try:
+            call_results = [c.get() for c in calls]
 
-        api3 = finding(parallel=p, debug=opts.debug, appid=opts.appid, config_file=opts.yaml)
-        api3.execute('findItemsAdvanced', {'keywords': 'php'})
-        apis.append(api3)
+            toprated = 0
+            for resp in call_results:
+                for item in resp.reply.searchResult.item:
+                    if item.topRatedListing == 'true':
+                        toprated += 1
 
-        p.wait()
+            print("Top Rated Listings: %s" % toprated)
 
-        if p.error():
-            print(p.error())
+        except ConnectionError as e:
+            print("%s" % e)
 
-        for api in apis:
-            dump(api)
+    except gevent.timeout.Timeout as e:
+        print("Calls reached timeout threshold: %s" % e)
 
-    except ConnectionError as e:
-        print(e)
-        print(e.response.dict())
+    finally:
+        timeout.cancel()
 
 if __name__ == "__main__":
     (opts, args) = init_options()
